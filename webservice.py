@@ -1,70 +1,66 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, jsonify
 import requests
 import os
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import time
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
-TARGET_URLS = {
-    "egt3": "http://egt3.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction",
-    "test12": "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction",
-    "test20": "http://test20.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
-}
+TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
 
+# Yükleme dizinini oluştur
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# 📌 1️⃣ Kullanıcıya Dosya Yükleme Formunu Göster
+# Dosya sistemi izleyici
+class Watcher(FileSystemEventHandler):
+    def on_created(self, event):
+        if event.is_directory:
+            return
+        if event.src_path.endswith(".xml"):
+            self.send_xml(event.src_path)
+
+    def send_xml(self, file_path):
+        with open(file_path, "r", encoding="utf-8") as file:
+            xml_data = file.read()
+
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        response = requests.post(TARGET_URL, headers=headers, data={"Request": xml_data})
+
+        print(f"XML gönderildi: {file_path}")
+        print(f"Durum Kodu: {response.status_code}")
+        print(f"Cevap: {response.text}")
+
+# Watchdog için Observer başlatmak
+def start_watching():
+    event_handler = Watcher()
+    observer = Observer()
+    observer.schedule(event_handler, UPLOAD_FOLDER, recursive=False)
+    observer.start()
+    print("Dinleme başlatıldı...")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
+# Flask route sadece servisi çalıştıracak
 @app.route("/")
-def upload_form():
-    return render_template("upload.html", target_urls=TARGET_URLS)
-
-# 📌 2️⃣ Dosya Yükleme İşlemi
-@app.route("/upload", methods=["POST"])
-def upload_file():
-    if "file" not in request.files:
-        return jsonify({"error": "Dosya seçilmedi!"}), 400
-
-    file = request.files["file"]
-
-    if file.filename == "":
-        return jsonify({"error": "Dosya adı geçersiz!"}), 400
-
-    if not file.filename.endswith(".xml"):
-        return jsonify({"error": "Sadece XML dosyaları kabul edilir!"}), 400
-
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-    file.save(file_path)
-
-    return jsonify({"message": "Dosya yüklendi!", "filename": file.filename})
-
-# 📌 3️⃣ Yüklenen XML Dosyasını Gönderme
-@app.route("/send", methods=["POST"])
-def send_xml():
-    file_name = request.json.get("filename")
-    target_site = request.json.get("target_site")
-
-    if not file_name:
-        return jsonify({"error": "Dosya adı belirtilmedi!"}), 400
-
-    if not target_site or target_site not in TARGET_URLS:
-        return jsonify({"error": "Geçersiz hedef site!"}), 400
-
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file_name)
-
-    if not os.path.exists(file_path):
-        return jsonify({"error": "Dosya bulunamadı!"}), 404
-
-    with open(file_path, "r", encoding="utf-8") as file:
-        xml_data = file.read()
-
-    target_url = TARGET_URLS[target_site]
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    response = requests.post(target_url, headers=headers, data={"Request": xml_data})
-
-    return jsonify({"status": response.status_code, "response": response.text})
+def home():
+    return jsonify({"status": "Dinleme başlatıldı. Lütfen XML dosyası ekleyin."})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+    # Watchdog'u başlat
+    from threading import Thread
+    thread = Thread(target=start_watching)
+    thread.daemon = True
+    thread.start()
+
+    # Flask uygulamasını başlat
+    app.run(host='0.0.0.0', port=5000, debug=False)
