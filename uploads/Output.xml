@@ -1,0 +1,12 @@
+<Anakart_Aktarma ID="1502000025838" Key="E7B3AAB9AF124223A3EDE9FE6FC92EE2">
+  <Anakart_Adi>M12 Civata</Anakart_Adi>
+  <Kart_Tipi>Kod Ailesi</Kart_Tipi>
+  <Anasinif>Bağlantılar</Anasinif>
+  <Olgu>Bağlantı Parçaları</Olgu>
+  <Ilgili_Anakart>MOM-M1#4:5 Motor</Ilgili_Anakart>
+  <Alt_Anakart_No>B10</Alt_Anakart_No>
+  <Anabirim>Adet</Anabirim>
+  <Ozel_Kod>M10x23&amp;amp;5</Ozel_Kod>
+  <Ilgili_Sablon>İş Malzemesi</Ilgili_Sablon>
+  <Aktarma_Adresi>http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx</Aktarma_Adresi>
+</Anakart_Aktarma>

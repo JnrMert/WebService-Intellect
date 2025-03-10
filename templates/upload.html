@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML Dosya Yükleme</title>
+</head>
+<body>
+    <h2>XML Dosya Yükleme</h2>
+    
+    <form id="uploadForm">
+        <input type="file" id="fileInput" name="file" accept=".xml" required>
+        <button type="submit">Yükle</button>
+    </form>
+
+    <h3 id="uploadStatus"></h3>
+
+    <button id="sendButton" style="display:none;">Gönder</button>
+
+    <h3 id="sendStatus"></h3>
+
+    <script>
+        let uploadedFileName = "";
+
+        document.getElementById("uploadForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            
+            let fileInput = document.getElementById("fileInput").files[0];
+            if (!fileInput) {
+                alert("Lütfen bir XML dosyası seçin!");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", fileInput);
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById("uploadStatus").innerText = "Hata: " + data.error;
+                } else {
+                    uploadedFileName = data.filename;
+                    document.getElementById("uploadStatus").innerText = "Dosya başarıyla yüklendi!";
+                    document.getElementById("sendButton").style.display = "block";
+                }
+            })
+            .catch(error => console.error("Hata:", error));
+        });
+
+        document.getElementById("sendButton").addEventListener("click", function() {
+            if (!uploadedFileName) {
+                alert("Önce bir dosya yükleyin!");
+                return;
+            }
+
+            fetch("/send", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ filename: uploadedFileName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("sendStatus").innerText = "Durum Kodu: " + data.status + "\nCevap: " + data.response;
+            })
+            .catch(error => console.error("Hata:", error));
+        });
+    </script>
+</body>
+</html>
