@@ -5,7 +5,11 @@ import os
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
-TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
+TARGET_URLS = {
+    "egt3": "http://egt3.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction",
+    "test12": "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction",
+    "test20": "http://test20.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
+}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -15,7 +19,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # 📌 1️⃣ Kullanıcıya Dosya Yükleme Formunu Göster
 @app.route("/")
 def upload_form():
-    return render_template("upload.html")
+    return render_template("upload.html", target_urls=TARGET_URLS)
 
 # 📌 2️⃣ Dosya Yükleme İşlemi
 @app.route("/upload", methods=["POST"])
@@ -40,9 +44,13 @@ def upload_file():
 @app.route("/send", methods=["POST"])
 def send_xml():
     file_name = request.json.get("filename")
+    target_site = request.json.get("target_site")
 
     if not file_name:
         return jsonify({"error": "Dosya adı belirtilmedi!"}), 400
+
+    if not target_site or target_site not in TARGET_URLS:
+        return jsonify({"error": "Geçersiz hedef site!"}), 400
 
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], file_name)
 
@@ -52,8 +60,9 @@ def send_xml():
     with open(file_path, "r", encoding="utf-8") as file:
         xml_data = file.read()
 
+    target_url = TARGET_URLS[target_site]
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    response = requests.post(TARGET_URL, headers=headers, data={"Request": xml_data})
+    response = requests.post(target_url, headers=headers, data={"Request": xml_data})
 
     return jsonify({"status": response.status_code, "response": response.text})
 
