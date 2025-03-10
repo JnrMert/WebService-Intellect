@@ -10,6 +10,14 @@
     
     <form id="uploadForm">
         <input type="file" id="fileInput" name="file" accept=".xml" required>
+        
+        <label for="targetSite">Hedef Site Seçin:</label>
+        <select id="targetSite" name="target_site" required>
+            <option value="egt3">egt3.probizyazilim.com</option>
+            <option value="test12">test12.probizyazilim.com</option>
+            <option value="test20">test20.probizyazilim.com</option>
+        </select>
+        
         <button type="submit">Yükle</button>
     </form>
 
@@ -21,11 +29,15 @@
 
     <script>
         let uploadedFileName = "";
+        let selectedTargetSite = "";
 
+        // Dosya yükleme formunu işleme
         document.getElementById("uploadForm").addEventListener("submit", function(event) {
             event.preventDefault();
             
             let fileInput = document.getElementById("fileInput").files[0];
+            selectedTargetSite = document.getElementById("targetSite").value; // Hedef siteyi al
+            
             if (!fileInput) {
                 alert("Lütfen bir XML dosyası seçin!");
                 return;
@@ -51,6 +63,7 @@
             .catch(error => console.error("Hata:", error));
         });
 
+        // Dosya gönderme işlemi
         document.getElementById("sendButton").addEventListener("click", function() {
             if (!uploadedFileName) {
                 alert("Önce bir dosya yükleyin!");
@@ -62,7 +75,10 @@
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ filename: uploadedFileName })
+                body: JSON.stringify({ 
+                    filename: uploadedFileName,
+                    target_site: selectedTargetSite // Seçilen hedef siteyi gönder
+                })
             })
             .then(response => response.json())
             .then(data => {
