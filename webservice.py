@@ -4,7 +4,7 @@ import requests
 app = Flask(__name__)
 
 # Hedef URL
-TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
+TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx"
 
 # 📌 GET isteği servisin çalıştığını kontrol eder
 @app.route("/", methods=["GET"])
@@ -15,7 +15,7 @@ def home():
         mimetype="text/xml"
     )
 
-# 📌 Gelen XML verisini hedefe yönlendirir
+# 📌 Gelen XML verisini alıp SOAP formatında hedefe yönlendirir
 @app.route("/", methods=["POST"])
 def receive_and_forward_xml():
     xml_data = request.data.decode("utf-8")  # Gelen XML verisini al
@@ -28,18 +28,26 @@ def receive_and_forward_xml():
             status=400
         )
 
+    # 📌 Servisin beklediği SOAP 1.1 formatına uygun XML şablonu
+    soap_template = f"""<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+                   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+            <ExecuteTransaction xmlns="http://tempuri.org/Intellect/ExecuteTransaction">
+                <Request>{xml_data}</Request>
+            </ExecuteTransaction>
+        </soap:Body>
+    </soap:Envelope>"""
+
     headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": '"http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"'
     }
 
-    payload = {
-        "Request": xml_data  # Hedef servisin beklediği format
-    }
+    # Hedef servise SOAP XML gönderimi
+    response = requests.post(TARGET_URL, headers=headers, data=soap_template)
 
-    # Hedef servise gönderim
-    response = requests.post(TARGET_URL, headers=headers, data=payload)
-
-    # Gelen yanıtı döndür
     return Response(response.text, mimetype="text/xml", status=response.status_code)
 
 if __name__ == "__main__":
