@@ -1,11 +1,12 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, Response
 import requests
 
 app = Flask(__name__)
 
-# Hedef URL (Bu değişmeyecek)
+# Hedef URL
 TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
 
+# 📌 GET isteği sadece servisin çalıştığını kontrol eder
 @app.route("/", methods=["GET"])
 def home():
     return Response(
@@ -14,27 +15,39 @@ def home():
         mimetype="text/xml"
     )
 
-# 📌 XML POST edildiğinde hedefe yönlendirir
+# 📌 Gelen XML verisini SOAP formatında hedefe yönlendirir
 @app.route("/", methods=["POST"])
 def receive_and_forward_xml():
-    # Gönderilen XML verisini al
-    xml_data = request.data.decode("utf-8")
+    xml_data = request.data.decode("utf-8")  # Gelen ham XML verisini al
 
     if not xml_data:
-        return jsonify({"error": "Boş XML verisi gönderilemez!"}), 400
+        return Response(
+            """<?xml version="1.0" encoding="UTF-8"?>
+            <error>Boş XML verisi gönderilemez!</error>""",
+            mimetype="text/xml",
+            status=400
+        )
 
-    # Hedef servise XML'i post et
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    payload = {"Request": xml_data}  # XML verisini x-www-form-urlencoded formatında gönder
+    # 📌 SOAP Formatına Uygun XML Şablonu
+    soap_template = f"""<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:int="http://test12.probizyazilim.com/Intellect/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <int:ExecuteTransaction>
+                <int:Request>{xml_data}</int:Request>
+            </int:ExecuteTransaction>
+        </soapenv:Body>
+    </soapenv:Envelope>"""
 
-    response = requests.post(TARGET_URL, headers=headers, data=payload)
+    headers = {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": "http://test12.probizyazilim.com/Intellect/ExecuteTransaction"
+    }
 
-    # Hedef sistemin cevabını döndür
-    return jsonify({
-        "sent_to": TARGET_URL,
-        "status": response.status_code,
-        "response": response.text
-    })
+    # Hedef servise SOAP XML gönderimi
+    response = requests.post(TARGET_URL, headers=headers, data=soap_template)
+
+    return Response(response.text, mimetype="text/xml", status=response.status_code)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
