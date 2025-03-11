@@ -1,105 +1,137 @@
 from flask import Flask, request, Response
 import requests
-import xml.etree.ElementTree as ET
-import re
+import logging
+
+# Loglama ayarları
+logging.basicConfig(level=logging.DEBUG, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx"
 
-# XML yanıtını temizleyen fonksiyon
-def clean_xml_response(xml_text):
-    # Bazı temel temizleme işlemleri
-    # BOM karakterlerini temizle
-    if xml_text.startswith('\ufeff'):
-        xml_text = xml_text[1:]
-    
-    # XML bildirimini düzelt (gerekirse)
-    if not xml_text.startswith('<?xml'):
-        xml_text = '<?xml version="1.0" encoding="utf-8"?>' + xml_text
-    
-    # Geçersiz karakterleri temizle
-    xml_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', xml_text)
-    
-    return xml_text
-
 @app.route("/", methods=["GET"])
 def home():
-    return "XML Forwarder Çalışıyor"
+    return "XML Forwarder Çalışıyor - Debugging Aktif"
+
+@app.route("/debug", methods=["GET", "POST"])
+def debug_endpoint():
+    """Gelen istekleri ve içeriklerini görüntüle"""
+    
+    output = "DEBUG BİLGİLERİ:\n\n"
+    output += f"Method: {request.method}\n"
+    output += f"Headers: {dict(request.headers)}\n\n"
+    
+    if request.method == 'POST':
+        if 'application/x-www-form-urlencoded' in request.headers.get('Content-Type', ''):
+            output += f"Form verileri: {dict(request.form)}\n\n"
+        
+        if request.data:
+            output += f"Raw veri: {request.data.decode('utf-8')}\n\n"
+    
+    return Response(output, mimetype='text/plain')
 
 @app.route("/", methods=["POST"])
 def forward_xml():
-    try:
-        # Content-Type kontrolü
-        content_type = request.headers.get('Content-Type', '')
-        
-        # Form verisi kontrolü
-        if 'application/x-www-form-urlencoded' in content_type and 'Request' in request.form:
-            client_data = request.form['Request']
-            print(f"Form verisi alındı: {client_data[:100]}...")
+    # Gelen veriyi yazdır
+    logger.info("Yeni istek alındı")
+    
+    # İstek içeriğini kaydet
+    content_type = request.headers.get('Content-Type', '')
+    logger.info(f"Content-Type: {content_type}")
+    
+    # XML verisini al
+    if 'application/x-www-form-urlencoded' in content_type:
+        if 'Request' in request.form:
+            xml_data = request.form['Request']
+            logger.info(f"Form verisi alındı (Request): {xml_data}")
         else:
-            client_data = request.data.decode('utf-8')
-            print(f"Raw veri alındı: {client_data[:100]}...")
-        
-        # SOAP XML şablonu
-        soap_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+            all_form = dict(request.form)
+            logger.info(f"Tüm form verileri: {all_form}")
+            xml_data = str(all_form)
+    else:
+        try:
+            xml_data = request.data.decode('utf-8')
+            logger.info(f"Raw veri alındı: {xml_data}")
+        except:
+            xml_data = str(request.data)
+            logger.info(f"Binary veri alındı: {xml_data[:100]}")
+    
+    # SOAP envelope oluştur
+    soap_envelope = f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <soap:Body>
     <ExecuteTransaction xmlns="http://tempuri.org/Intellect/ExecuteTransaction">
-      <Request>{client_data}</Request>
+      <Request>{xml_data}</Request>
     </ExecuteTransaction>
   </soap:Body>
 </soap:Envelope>"""
+    
+    # Gönderilen SOAP verisi
+    logger.info(f"Gönderilen SOAP: {soap_envelope}")
+    
+    # İsteği gönder
+    headers = {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': 'http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction'
+    }
+    
+    try:
+        # İstek gönderiliyor
+        logger.info(f"İstek gönderiliyor: URL={TARGET_URL}, Headers={headers}")
+        response = requests.post(TARGET_URL, data=soap_envelope, headers=headers)
         
-        headers = {
-            'Content-Type': 'text/xml; charset=utf-8',
-            'SOAPAction': 'http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction'
-        }
+        # Yanıt bilgilerini yazdır
+        logger.info(f"Yanıt durum kodu: {response.status_code}")
+        logger.info(f"Yanıt başlıkları: {dict(response.headers)}")
+        logger.info(f"Yanıt içeriği: {response.text}")
         
-        # İsteği gönder
-        response = requests.post(TARGET_URL, data=soap_xml, headers=headers)
-        
-        print(f"Yanıt Kodu: {response.status_code}")
-        print(f"Yanıt başlığı: {response.text[:200]}...")
-        
-        if response.status_code == 200:
-            try:
-                # Yanıtı temizle
-                clean_response = clean_xml_response(response.text)
+        # Yanıtı döndür
+        return Response(
+            f"""
+            <html>
+            <head><title>XML Forwarder Debug</title></head>
+            <body>
+                <h1>XML Forwarder Debug</h1>
+                <h2>Gelen Veri:</h2>
+                <pre>{xml_data}</pre>
                 
-                # XML'i ayrıştır (test amaçlı)
-                try:
-                    ET.fromstring(clean_response)
-                    print("XML doğrulama başarılı!")
-                except Exception as xml_error:
-                    print(f"XML ayrıştırma hatası: {str(xml_error)}")
+                <h2>Gönderilen SOAP:</h2>
+                <pre>{soap_envelope}</pre>
                 
-                # SOAP zarfından içeriği çıkarma denemesi
-                try:
-                    # Basit bir regex yaklaşımı
-                    result_match = re.search(r'<ExecuteTransactionResult>(.*?)</ExecuteTransactionResult>', clean_response, re.DOTALL)
-                    if result_match:
-                        result_content = result_match.group(1)
-                        print(f"Çıkarılan içerik: {result_content[:100]}...")
-                        return Response(result_content, mimetype='text/xml')
-                except Exception as e:
-                    print(f"İçerik çıkarma hatası: {str(e)}")
+                <h2>Yanıt Durum Kodu:</h2>
+                <pre>{response.status_code}</pre>
                 
-                # Temizlenmiş yanıtı gönder
-                return Response(clean_response, mimetype='text/xml')
-            except Exception as parsing_error:
-                print(f"Yanıt temizleme hatası: {str(parsing_error)}")
-                return Response(response.text, mimetype='text/plain')
-        else:
-            return Response(
-                f"<error>Servis hatası: HTTP {response.status_code}</error>",
-                mimetype='text/xml', 
-                status=response.status_code
-            )
-            
+                <h2>Yanıt Başlıkları:</h2>
+                <pre>{dict(response.headers)}</pre>
+                
+                <h2>Yanıt İçeriği:</h2>
+                <pre>{response.text}</pre>
+            </body>
+            </html>
+            """,
+            mimetype='text/html'
+        )
+    
     except Exception as e:
-        error_message = f"İşlem hatası: {str(e)}"
-        print(error_message)
-        return Response(f"<error>{error_message}</error>", mimetype='text/xml', status=500)
+        error_message = f"İstek gönderme hatası: {str(e)}"
+        logger.error(error_message)
+        return Response(
+            f"""
+            <html>
+            <head><title>XML Forwarder Error</title></head>
+            <body>
+                <h1>Hata Oluştu</h1>
+                <pre>{error_message}</pre>
+                
+                <h2>Gelen Veri:</h2>
+                <pre>{xml_data}</pre>
+            </body>
+            </html>
+            """,
+            mimetype='text/html',
+            status=500
+        )
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
