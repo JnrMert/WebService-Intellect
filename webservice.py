@@ -1,68 +1,33 @@
-from flask import Flask, request, Response
+from flask import Flask, Response
 import requests
-import os
 
 app = Flask(__name__)
 
 # Hedef URL
-TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
+TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx"
 
-# Log klasörü oluştur
-LOG_FOLDER = "logs"
-if not os.path.exists(LOG_FOLDER):
-    os.makedirs(LOG_FOLDER)
-
-LOG_FILE = os.path.join(LOG_FOLDER, "received_xml.log")
-
-# 📌 Gelen XML'i kaydetmek için fonksiyon
-def log_data(data, response_text):
-    with open(LOG_FILE, "a", encoding="utf-8") as log_file:
-        log_file.write("\n--- Yeni İstek ---\n")
-        log_file.write(f"Gelen XML:\n{data}\n")
-        log_file.write(f"Servisten Gelen Yanıt:\n{response_text}\n")
-        log_file.write("-" * 50 + "\n")
-
-# 📌 GET isteği servisin çalıştığını kontrol eder
+# 📌 Gelen XML verisini SOAP formatında alıp döndürme
 @app.route("/", methods=["GET"])
-def home():
-    return Response(
-        """<?xml version="1.0" encoding="UTF-8"?>
-        <status>Flask XML Listener Çalışıyor</status>""",
-        mimetype="text/xml"
-    )
-
-# 📌 Gelen XML verisini hedefe yönlendirir
-@app.route("/", methods=["POST"])
-def receive_and_forward_xml():
-    xml_data = request.data.decode("utf-8")  # Gelen XML verisini al
-
-    if not xml_data:
-        return Response(
-            """<?xml version="1.0" encoding="UTF-8"?>
-            <error>Boş XML verisi gönderilemez!</error>""",
-            mimetype="text/xml",
-            status=400
-        )
-
-    print("\n--- Gelen XML ---")
-    print(xml_data)  # Terminale yazdır
+def get_soap_response():
+    # SOAP 1.1 İsteği
+    soap_request = """<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+                   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+            <ExecuteTransaction xmlns="http://tempuri.org/Intellect/ExecuteTransaction">
+                <Request>Test Request</Request>
+            </ExecuteTransaction>
+        </soap:Body>
+    </soap:Envelope>"""
 
     headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": "http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"
     }
 
-    payload = {
-        "Request": xml_data  # Hedef servisin beklediği format
-    }
-
-    # Hedef servise gönderim
-    response = requests.post(TARGET_URL, headers=headers, data=payload)
-
-    # Yanıtı logla
-    print("\n--- Servisten Gelen Yanıt ---")
-    print(response.text)
-
-    log_data(xml_data, response.text)  # XML'i ve yanıtı dosyaya kaydet
+    # 📌 Hedef servise GET isteği yerine SOAP XML gönderimi yap
+    response = requests.post(TARGET_URL, headers=headers, data=soap_request)
 
     # Gelen yanıtı döndür
     return Response(response.text, mimetype="text/xml", status=response.status_code)
