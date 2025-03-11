@@ -1,36 +1,18 @@
-from flask import Flask, Response
-import requests
+from flask import Flask, request, Response
 
 app = Flask(__name__)
 
-# Hedef URL
-TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx"
-
-# 📌 Gelen XML verisini SOAP formatında alıp döndürme
+# 📌 GET isteği ile gelen SOAP XML'i yakala ve ekrana yazdır
 @app.route("/", methods=["GET"])
-def get_soap_response():
-    # SOAP 1.1 İsteği
-    soap_request = """<?xml version="1.0" encoding="utf-8"?>
-    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-                   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
-                   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-        <soap:Body>
-            <ExecuteTransaction xmlns="http://tempuri.org/Intellect/ExecuteTransaction">
-                <Request>Test Request</Request>
-            </ExecuteTransaction>
-        </soap:Body>
-    </soap:Envelope>"""
+def receive_soap_request():
+    xml_data = request.data.decode("utf-8")  # Gelen XML verisini al
 
-    headers = {
-        "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"
-    }
+    if not xml_data:
+        return Response("Boş XML geldi!", mimetype="text/plain", status=400)
 
-    # 📌 Hedef servise GET isteği yerine SOAP XML gönderimi yap
-    response = requests.post(TARGET_URL, headers=headers, data=soap_request)
+    print("\n📥 Gelen SOAP XML:\n", xml_data)  # Gelen XML içeriğini konsola yazdır
 
-    # Gelen yanıtı döndür
-    return Response(response.text, mimetype="text/xml", status=response.status_code)
+    return Response("XML alındı!", mimetype="text/plain", status=200)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
