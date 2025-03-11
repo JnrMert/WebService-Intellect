@@ -6,10 +6,13 @@ app = Flask(__name__)
 # Hedef URL (Bu değişmeyecek)
 TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx/ExecuteTransaction"
 
-# 📌 GET isteği servisin çalıştığını kontrol eder
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"status": "Flask XML Listener Çalışıyor", "target_url": TARGET_URL})
+    return Response(
+        """<?xml version="1.0" encoding="UTF-8"?>
+        <status>Flask XML Listener Çalışıyor</status>""",
+        mimetype="text/xml"
+    )
 
 # 📌 XML POST edildiğinde hedefe yönlendirir
 @app.route("/", methods=["POST"])
