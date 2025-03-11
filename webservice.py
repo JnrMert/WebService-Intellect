@@ -1,10 +1,13 @@
 from flask import Flask, request, Response
 import requests
+from zeep import Client
+from zeep.transports import Transport
 
 app = Flask(__name__)
 
-# Hedef URL
+# Hedef WSDL URL - WSDL bulamazsanız doğrudan SOAP endpoint kullanacağız
 TARGET_URL = "http://test12.probizyazilim.com/Intellect/ExecuteTransaction.asmx"
+SOAP_ACTION = "http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"
 
 # 📌 GET isteği servisin çalıştığını kontrol eder
 @app.route("/", methods=["GET"])
@@ -18,12 +21,17 @@ def home():
 # 📌 Gelen XML verisini alıp SOAP formatında hedefe yönlendirir
 @app.route("/", methods=["POST"])
 def receive_and_forward_xml():
+    # İstek türünü kontrol et
+    content_type = request.headers.get('Content-Type', '')
+    
     # Form verisinden XML'i al (x-www-form-urlencoded için)
-    if request.form and 'Request' in request.form:
+    if 'application/x-www-form-urlencoded' in content_type and 'Request' in request.form:
         xml_data = request.form['Request']
+        print(f"Form verisi alındı: {xml_data[:100]}...")
     # Direkt raw veriden XML'i al
     elif request.data:
         xml_data = request.data.decode("utf-8")
+        print(f"Raw veri alındı: {xml_data[:100]}...")
     else:
         return Response(
             """<?xml version="1.0" encoding="UTF-8"?>
@@ -32,12 +40,10 @@ def receive_and_forward_xml():
             status=400
         )
     
-    # XML içeriğini temizle
-    xml_data = xml_data.strip()
-    
-    # 📌 Düzeltilmiş SOAP 1.1 formatına uygun XML şablonu
-    # soap namespace'i doğru şekilde ayarlandı
-    soap_template = f"""<?xml version="1.0" encoding="utf-8"?>
+    # Yöntem 1: Doğrudan SOAP isteği (requests ile)
+    try:
+        # SOAP Envelope oluştur
+        soap_envelope = f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
                xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -47,21 +53,42 @@ def receive_and_forward_xml():
         </ExecuteTransaction>
     </soap:Body>
 </soap:Envelope>"""
-    
-    headers = {
-        "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"
-    }
-    
-    try:
-        # Hedef servise SOAP XML gönderimi
-        response = requests.post(TARGET_URL, headers=headers, data=soap_template)
+
+        print(f"Gönderiyor: {soap_envelope[:200]}...")
         
-        # Yanıt durumunu logla
+        headers = {
+            "Content-Type": "text/xml; charset=utf-8",
+            "SOAPAction": SOAP_ACTION
+        }
+        
+        response = requests.post(TARGET_URL, headers=headers, data=soap_envelope)
+        
         print(f"Yanıt Kodu: {response.status_code}")
-        print(f"Yanıt İçeriği: {response.text[:200]}...")
+        print(f"Yanıt: {response.text[:200]}...")
         
-        return Response(response.text, mimetype="text/xml", status=response.status_code)
+        if response.status_code == 200:
+            return Response(response.text, mimetype="text/xml")
+        else:
+            print(f"Hata yanıtı: {response.text}")
+            
+            # Yöntem 2: Zeep ile deneyelim
+            try:
+                # Zeep transport oluştur
+                transport = Transport()
+                client = Client(wsdl=f"{TARGET_URL}?WSDL", transport=transport)
+                
+                # Servis metodunu çağır
+                result = client.service.ExecuteTransaction(Request=xml_data)
+                return Response(str(result), mimetype="text/xml")
+            except Exception as zeep_error:
+                print(f"Zeep hatası: {str(zeep_error)}")
+                return Response(
+                    f"""<?xml version="1.0" encoding="UTF-8"?>
+                    <error>İki yöntem de başarısız oldu: {str(zeep_error)}</error>""",
+                    mimetype="text/xml",
+                    status=500
+                )
+            
     except Exception as e:
         error_message = f"Hata oluştu: {str(e)}"
         print(error_message)
