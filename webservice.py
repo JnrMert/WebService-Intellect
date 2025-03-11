@@ -2,17 +2,23 @@ from flask import Flask, request, Response
 
 app = Flask(__name__)
 
-# 📌 GET isteği ile gelen SOAP XML'i yakala ve ekrana yazdır
+# 📌 Gelen GET isteğini logla
 @app.route("/", methods=["GET"])
 def receive_soap_request():
+    print("\n==> Yeni GET isteği alındı!")
+    
+    # 📌 Tüm başlıkları yazdır
+    print("📌 Başlıklar:", request.headers)
+
+    # 📌 XML içeriği varsa yazdır
     xml_data = request.data.decode("utf-8")  # Gelen XML verisini al
 
-    if not xml_data:
-        return Response("Boş XML geldi!", mimetype="text/plain", status=400)
+    if xml_data:
+        print("\n📥 Gelen SOAP XML:\n", xml_data)
+    else:
+        print("\n⚠️ Uyarı: Gelen istekte XML verisi YOK!")
 
-    print("\n📥 Gelen SOAP XML:\n", xml_data)  # Gelen XML içeriğini konsola yazdır
-
-    return Response("XML alındı!", mimetype="text/plain", status=200)
+    return Response("GET isteği alındı, logları kontrol et!", mimetype="text/plain", status=200)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
