@@ -42,7 +42,7 @@ def receive_and_forward_xml():
 
     headers = {
         "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": '"http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"'
+        "SOAPAction": "http://tempuri.org/Intellect/ExecuteTransaction/ExecuteTransaction"
     }
 
     # Hedef servise SOAP XML gönderimi
