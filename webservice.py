@@ -35,17 +35,18 @@ def receive_and_forward_xml():
     # XML içeriğini temizle
     xml_data = xml_data.strip()
     
-    # 📌 Servisin beklediği SOAP 1.1 formatına uygun XML şablonu
+    # 📌 Düzeltilmiş SOAP 1.1 formatına uygun XML şablonu
+    # soap namespace'i doğru şekilde ayarlandı
     soap_template = f"""<?xml version="1.0" encoding="utf-8"?>
-    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-                   xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
-                   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-        <soap:Body>
-            <ExecuteTransaction xmlns="http://tempuri.org/Intellect/ExecuteTransaction">
-                <Request>{xml_data}</Request>
-            </ExecuteTransaction>
-        </soap:Body>
-    </soap:Envelope>"""
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Body>
+        <ExecuteTransaction xmlns="http://tempuri.org/Intellect/ExecuteTransaction">
+            <Request>{xml_data}</Request>
+        </ExecuteTransaction>
+    </soap:Body>
+</soap:Envelope>"""
     
     headers = {
         "Content-Type": "text/xml; charset=utf-8",
@@ -58,7 +59,7 @@ def receive_and_forward_xml():
         
         # Yanıt durumunu logla
         print(f"Yanıt Kodu: {response.status_code}")
-        print(f"Yanıt: {response.text[:200]}...")
+        print(f"Yanıt İçeriği: {response.text[:200]}...")
         
         return Response(response.text, mimetype="text/xml", status=response.status_code)
     except Exception as e:
